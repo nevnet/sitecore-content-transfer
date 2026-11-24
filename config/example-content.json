@@ -1,0 +1,15 @@
+{
+  "database": "master",
+  "paths": [
+    {
+      "itemPath": "/sitecore/content/SiteCollection/Site/Home",
+      "scope": "ItemAndDescendants",
+      "mergeStrategy": "KeepExistingItem"
+    },
+    {
+      "itemPath": "/sitecore/content/SiteCollection/Site/Data",
+      "scope": "ItemAndDescendants",
+      "mergeStrategy": "KeepExistingItem"
+    }
+  ]
+}

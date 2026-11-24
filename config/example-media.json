@@ -1,0 +1,10 @@
+{
+  "database": "master",
+  "paths": [
+    {
+      "itemPath": "/sitecore/media library/Project/SiteCollection/Site",
+      "scope": "ItemAndDescendants",
+      "mergeStrategy": "KeepExistingItem"
+    }
+  ]
+}

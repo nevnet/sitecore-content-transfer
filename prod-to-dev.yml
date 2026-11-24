@@ -1,0 +1,75 @@
+# Manual launcher for the same entry point used locally. No CLI, SPE, build or publish.
+trigger: none
+pr: none
+
+parameters:
+  - name: configuration
+    displayName: Example site transfer configuration
+    type: string
+    default: example-content.json
+    values:
+      - example-content.json
+      - example-media.json
+  - name: mergeStrategyOverride
+    displayName: Merge strategy (UseConfiguration respects the JSON)
+    type: string
+    default: UseConfiguration
+    values:
+      - UseConfiguration
+      - KeepExistingItem
+      - OverrideExistingItem
+      - OverrideExistingTree
+  - name: verbose
+    displayName: Sanitized verbose diagnostics
+    type: boolean
+    default: false
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: sitecore-transfer
+  # Add these environment automation credentials; existing cloud/CLI credentials
+  # are not assumed to have access to the Content Transfer and Item Transfer APIs.
+  # SOURCE_CM_URL, DESTINATION_CM_URL
+  # SOURCE_CLIENT_ID, SOURCE_CLIENT_SECRET (secret)
+  # DESTINATION_CLIENT_ID, DESTINATION_CLIENT_SECRET (secret)
+
+jobs:
+  - job: TransferContent
+    displayName: Transfer production authoring content to development
+    timeoutInMinutes: 360
+    steps:
+      - checkout: self
+        clean: true
+        fetchDepth: 1
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $journalDirectory = Join-Path $env:BUILD_ARTIFACTSTAGINGDIRECTORY 'sitecore-transfer'
+          New-Item -ItemType Directory -Path $journalDirectory -Force | Out-Null
+          $arguments = @{
+            ConfigPath = Join-Path $env:BUILD_SOURCESDIRECTORY "config/$env:TRANSFER_CONFIGURATION"
+            StatePath = Join-Path $journalDirectory 'execution.json'
+            Verbose = $env:TRANSFER_VERBOSE -eq 'true'
+          }
+          if ($env:TRANSFER_MERGE_STRATEGY -ne 'UseConfiguration') {
+            $arguments.MergeStrategyOverride = $env:TRANSFER_MERGE_STRATEGY
+          }
+          & (Join-Path $env:BUILD_SOURCESDIRECTORY 'Invoke-ContentTransfer.ps1') @arguments
+        displayName: Run content transfer (production to development)
+        env:
+          TRANSFER_CONFIGURATION: ${{ parameters.configuration }}
+          TRANSFER_MERGE_STRATEGY: ${{ parameters.mergeStrategyOverride }}
+          TRANSFER_VERBOSE: ${{ lower(parameters.verbose) }}
+          SITECORE_TRANSFER_SOURCE_URL: $(SOURCE_CM_URL)
+          SITECORE_TRANSFER_DESTINATION_URL: $(DESTINATION_CM_URL)
+          SITECORE_TRANSFER_SOURCE_CLIENT_ID: $(SOURCE_CLIENT_ID)
+          SITECORE_TRANSFER_SOURCE_CLIENT_SECRET: $(SOURCE_CLIENT_SECRET)
+          SITECORE_TRANSFER_DESTINATION_CLIENT_ID: $(DESTINATION_CLIENT_ID)
+          SITECORE_TRANSFER_DESTINATION_CLIENT_SECRET: $(DESTINATION_CLIENT_SECRET)
+      - task: PublishPipelineArtifact@1
+        displayName: Retain execution journal (including failures)
+        condition: always()
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/sitecore-transfer
+          artifact: sitecore-transfer-journal
